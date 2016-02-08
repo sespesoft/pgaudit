@@ -25,7 +25,6 @@ CREATE OR REPLACE FUNCTION pgaudit.table(name, name) RETURNS VARCHAR
 LANGUAGE plpgsql AS $audit_table$
 DECLARE
     trigger_auditor TEXT;
-    table_name ALIAS FOR $2;
     table_origin TEXT;
     schema_audit TEXT;
     table_log TEXT;
@@ -42,7 +41,7 @@ BEGIN
             ',comando       char(1) NOT NULL CHECK( comando IN (''I'', ''U'', ''D''))'||
             ',old           '||table_origin||
             ',new           '||table_origin||
-            ',CONSTRAINT    '||schema_audit||'_'||table_name||'_pk PRIMARY KEY (id))';
+            ',CONSTRAINT    '||schema_audit||'_'||$2||'_pk PRIMARY KEY (id))';
     --Crea el trigger para la tabla a auditar
     trigger_auditor := $FUNCTION$
         CREATE OR REPLACE FUNCTION TG_TABLE_NAME_audit() RETURNS TRIGGER STRICT LANGUAGE plpgsql

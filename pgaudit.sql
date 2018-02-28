@@ -23,6 +23,16 @@ BEGIN
 END
 $trail_session$;
 
+CREATE OR REPLACE FUNCTION pgaudit.table(table_name name) RETURNS VARCHAR
+LANGUAGE plpgsql AS $audit_table_whithout_schema$
+DECLARE
+    result VARCHAR;
+BEGIN
+    SELECT pgaudit.table('public', table_name) INTO result;
+    RETURN result;
+END
+$audit_table_whithout_schema$;
+
 CREATE OR REPLACE FUNCTION pgaudit.table(schema name, table_name name) RETURNS VARCHAR
 LANGUAGE plpgsql AS $audit_table$
 DECLARE
@@ -36,11 +46,11 @@ BEGIN
     table_log := schema_audit || '.' || schema || '$' || table_name;
 
     EXECUTE 'CREATE TABLE IF NOT EXISTS ' || table_log || ' (' ||
-            'id             serial NOT NULL PRIMARY KEY' ||
+            'id             SERIAL NOT NULL PRIMARY KEY' ||
             ',register_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT current_timestamp' ||
             ',user_db       TEXT NOT NULL DEFAULT USER'
-            ',log_id        bigint' ||
-            ',command       char(1) NOT NULL REFERENCES pgaudit.config(key)' ||
+            ',log_id        TEXT' ||
+            ',command       CHAR(1) NOT NULL REFERENCES pgaudit.config(key)' ||
             ',old           ' || table_origin ||
             ',new           ' || table_origin || ')';
 

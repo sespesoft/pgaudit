@@ -1,6 +1,6 @@
 pgAudit
 =======
-Sistema base de auditoria para tablas postgreSQL.
+Sistema base de auditoria para tablas postgreSQL. [Marco referencial](http://www.juanluramirez.com/auditoria-bases-datos/).
 
 Instalación
 -----------
@@ -10,15 +10,17 @@ Configuración
 -------------
 Con solo ejecutar el archivo pgaudit.sql se crea toda la estructura que da soporte al sistema de auditoria, pero no funcionara hasta que se configuren las acciones a auditar; para esto se creo el archivo **config.sql** en el se encuentran los inserts necesarios para alimentar la tabla config del esquema pgaudit.
 
-| key | value | states |
-|-----|-------|--------|
+| key | value | state |
+|-----|-------|-------|
 | I | INSERT | 1 |
 | U | UPDATE | 1 |
-| D | INSERT | 1 |
+| D | DELETE | 1 |
 
-uso
+Si el sistema es ejecutado sin una configuración establecida no ingresara datos a las tablas auditadas.
+
+Uso
 ---
-Para auditar una tabla se hace uso de la función `pgaudit.table(schema, table)`, la cual se encarga de crear la tabla de auditoria *pgaudit.schema$table* dentro del esquema pgaudit.
+Para auditar una tabla se hace uso de la función `pgaudit.table(schema, table)` o `pgaudit.table(table)`, en este ultimo caso se fijara la tabla al esquema publico de la base de datos, de cualquier forma se creará la tabla de auditoria *pgaudit.schema$table*.
 
 | Campo | Descripción |
 |-------|-------------|

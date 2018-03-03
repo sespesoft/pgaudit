@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS pgaudit.config(
     state bit(1) NOT NULL DEFAULT '1'
 );
 
-CREATE OR REPLACE FUNCTION pgaudit.trail(log_id integer) RETURNS VOID
+CREATE OR REPLACE FUNCTION pgaudit.trail(log_id name) RETURNS VOID
 LANGUAGE plpgsql AS $trail_session$
 BEGIN
     PERFORM relname
@@ -58,7 +58,7 @@ BEGIN
         CREATE OR REPLACE FUNCTION TG_TABLE_NAME_audit() RETURNS TRIGGER STRICT LANGUAGE plpgsql
         AS $PROC$
         DECLARE
-            log_id BIGINT;
+            log_id TEXT;
             config RECORD;
         BEGIN
             PERFORM relname

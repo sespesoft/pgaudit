@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS pgaudit.config(
     state bit(1) NOT NULL DEFAULT '1'
 );
 
-CREATE OR REPLACE FUNCTION pgaudit.trail(log_id name) RETURNS VOID
+CREATE OR REPLACE FUNCTION pgaudit.trail(log_id name) RETURNS INTEGER
 LANGUAGE plpgsql AS $trail_session$
 BEGIN
     PERFORM relname
@@ -20,6 +20,7 @@ BEGIN
         DELETE FROM tbl_session WHERE name = 'log_id';
     END IF;
     INSERT INTO tbl_session VALUES ('log_id', log_id);
+    RETURN 1;
 END
 $trail_session$;
 

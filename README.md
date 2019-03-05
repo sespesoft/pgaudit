@@ -32,13 +32,15 @@ Para auditar una tabla se hace uso de la función `pgaudit.table(schema, table)`
 | old | Registro anterior a la modificación realizada, si la modificación fue de tipo *INSERT* este registro se encuentra vacío |
 | new | Registro posterior a la modificación realizada, si la modificación fue de tipo *DELETE* este registro se encuentra vacío |
 
-Al realizar una operación DML(Excepto SELECT) sobre una tabla auditada el sistema registra automáticamente en la tabla de auditoria los campos: *id*, *register_date*, *user_db*, *command*, *old* y *new*. Si se desea realizar auditoria directa sobre la aplicación se debe hacer uso del campo *log_id* para hacer referencia a la tabla que mantiene la información de ingreso del usuario al sistema o al mismo usuario que ingreso a la aplicación, el registro de esta información se debe realizar implementando la función `pgaudit.trail(idLog)` dentro de la aplicación.
+Al realizar una operación DML(Excepto SELECT) sobre una tabla auditada el sistema registra automáticamente en la tabla de auditoria los campos: *id*, *register_date*, *user_db*, *command*, *old* y *new*. Si se desea realizar auditoria directa sobre la aplicación se debe hacer uso del campo *log_id*, este campo hace referencia a la tabla que mantiene la información de ingreso del usuario al sistema o al mismo usuario que ingreso a la aplicación, el registro de esta información se debe realizar implementando la función `pgaudit.trail(idLog)` dentro de la aplicación.
 
 ```php
 <?php
 $db = new PDO("pgsql:dbname=$dbname;host=$host", $dbuser, $dbpass);
-$db->exec("SELECT pgaudit.trail($_SESSION['log'])");
+$db->exec("SELECT pgaudit.trail('$log')");
 ```
+
+Se debe tener especial cuidado de ejecutar correctamente esta función, en ocaciones se puede perder la referencia al log ya que la conexión se cierra y con ella la tabla temporal que mantiene el dato en sesión para ser consumido por el trigger.
 
 Las operaciones soportadas por pgAudit son: INSERT, UPDATE y DELETE, cada una de estas operaciones crea un registro en la tabla de auditoria.
 

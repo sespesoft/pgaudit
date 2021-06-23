@@ -6,95 +6,86 @@ CREATE TABLE IF NOT EXISTS pgaudit.config(
     state bit(1) NOT NULL DEFAULT '1'
 );
 
-CREATE OR REPLACE FUNCTION pgaudit.trail(log_id name) RETURNS INTEGER
-LANGUAGE plpgsql AS $trail_session$
+CREATE TABLE IF NOT EXISTS pgaudit.log(
+    id            SERIAL NOT NULL PRIMARY KEY,
+    table_name    VARCHAR(250),
+    register_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
+    user_db       TEXT NOT NULL DEFAULT USER,
+    session_id        TEXT,
+    command       CHAR(1) NOT NULL REFERENCES pgaudit.config(key),
+    old           JSON,
+    new           JSON
+);
+
+CREATE OR REPLACE FUNCTION pgaudit.track() RETURNS TRIGGER STRICT LANGUAGE plpgsql
+AS $audit_table$
+DECLARE
+    session_id TEXT;
+    table_name TEXT;
+    config RECORD;
 BEGIN
+table_name := TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME;
     PERFORM relname
     FROM pg_class
     WHERE relname = 'tbl_session'
     AND CASE WHEN has_schema_privilege(relnamespace, 'USAGE')
         THEN pg_table_is_visible(oid) ELSE false END;
-    IF not FOUND THEN
-        CREATE TEMPORARY TABLE tbl_session (name TEXT, value TEXT);
+    IF not found THEN
+        session_id := NULL;
     ELSE
-        DELETE FROM tbl_session WHERE name = 'log_id';
+        session_id := (SELECT value FROM tbl_session WHERE name = 'session_id');
     END IF;
-    INSERT INTO tbl_session VALUES ('log_id', log_id);
-    RETURN 1;
-END
-$trail_session$;
 
-CREATE OR REPLACE FUNCTION pgaudit.table(table_name name) RETURNS VARCHAR
-LANGUAGE plpgsql AS $audit_table_whithout_schema$
-DECLARE
-    result VARCHAR;
-BEGIN
-    SELECT pgaudit.table('public', table_name) INTO result;
-    RETURN result;
+    SELECT * INTO config FROM pgaudit.config WHERE value = TG_OP AND state = '1';
+    IF FOUND THEN
+        IF TG_OP = 'INSERT' THEN
+            INSERT INTO pgaudit.log(session_id, table_name, command, new) VALUES (session_id,  table_name, config.key, row_to_json(NEW));
+        ELSIF TG_OP = 'DELETE' THEN
+            INSERT INTO pgaudit.log(session_id, table_name, command, old) VALUES (session_id, table_name, config.key, row_to_json(OLD));
+        ELSIF TG_OP = 'UPDATE' THEN
+            INSERT INTO pgaudit.log(session_id, table_name, command, old, new) VALUES (session_id, table_name, config.key, row_to_json(OLD), row_to_json(NEW));
+        END IF;
+    END IF;
+    RETURN NULL;
 END
-$audit_table_whithout_schema$;
+$audit_table$;
 
-CREATE OR REPLACE FUNCTION pgaudit.table(schema name, table_name name) RETURNS VARCHAR
-LANGUAGE plpgsql AS $audit_table$
+CREATE OR REPLACE FUNCTION pgaudit.unfollow(schema name, table_name name) RETURNS VARCHAR
+LANGUAGE plpgsql AS $unfollow_table$
 DECLARE
-    trigger_auditor TEXT;
     table_origin TEXT;
-    schema_audit TEXT;
-    table_log TEXT;
 BEGIN
     table_origin := schema || '.' || table_name;
-    schema_audit := 'pgaudit';
-    table_log := schema_audit || '.' || schema || '$' || table_name;
+    EXECUTE 'DROP TRIGGER IF EXISTS audit ON ' || table_origin';
+    DROP FUNCTION IF EXIST pgaudit.track();';
+    RETURN table_origin || ' table ending auditing...';
+END
+$unfollow_table$;
 
-    EXECUTE 'CREATE TABLE IF NOT EXISTS ' || table_log || ' (' ||
-            'id             SERIAL NOT NULL PRIMARY KEY' ||
-            ',register_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT current_timestamp' ||
-            ',user_db       TEXT NOT NULL DEFAULT USER'
-            ',log_id        TEXT' ||
-            ',command       CHAR(1) NOT NULL REFERENCES pgaudit.config(key)' ||
-            ',old           ' || table_origin ||
-            ',new           ' || table_origin || ')';
-
-    trigger_auditor := $FUNCTION$
-        CREATE OR REPLACE FUNCTION TG_TABLE_NAME_audit() RETURNS TRIGGER STRICT LANGUAGE plpgsql
-        AS $PROC$
-        DECLARE
-            log_id TEXT;
-            config RECORD;
-        BEGIN
-            PERFORM relname
-            FROM pg_class
-            WHERE relname = 'tbl_session'
-            AND CASE WHEN has_schema_privilege(relnamespace, 'USAGE')
-                THEN pg_table_is_visible(oid) ELSE false END;
-            IF not found THEN
-                log_id := NULL;
-            ELSE
-                log_id := (SELECT value FROM tbl_session WHERE name = 'log_id');
-            END IF;
-
-            SELECT * INTO config FROM pgaudit.config WHERE value = TG_OP AND state = '1';
-            IF FOUND THEN
-                IF TG_OP = 'INSERT' THEN
-                    INSERT INTO TG_TABLE_NAME (log_id, command, new) VALUES (log_id, config.key, NEW);
-                ELSIF TG_OP = 'DELETE' THEN
-                    INSERT INTO TG_TABLE_NAME (log_id, command, old) VALUES (log_id, config.key, OLD);
-                ELSIF TG_OP = 'UPDATE' THEN
-                    INSERT INTO TG_TABLE_NAME (log_id, command, old, new) VALUES (log_id, config.key, OLD, NEW);
-                END IF;
-            END IF;
-            RETURN NULL;
-        END
-        $PROC$;
-    $FUNCTION$;
-
-    trigger_auditor := replace(trigger_auditor, 'TG_TABLE_NAME', table_log);
-    EXECUTE trigger_auditor;
-
+CREATE OR REPLACE FUNCTION pgaudit.follow(schema name, table_name name) RETURNS VARCHAR
+LANGUAGE plpgsql AS $follow_table$
+DECLARE
+    table_origin TEXT;
+BEGIN
+    table_origin := schema || '.' || table_name;
     EXECUTE 'DROP TRIGGER IF EXISTS audit ON ' || table_origin || ';CREATE TRIGGER audit ' ||
         ' AFTER INSERT OR UPDATE OR DELETE ON ' || table_origin ||
-        ' FOR EACH ROW EXECUTE PROCEDURE ' || table_log || '_audit();';
+        ' FOR EACH ROW EXECUTE PROCEDURE pgaudit.track();';
 
     RETURN table_origin || ' table being audited...';
 END
-$audit_table$;
+$follow_table$;
+
+CREATE OR REPLACE FUNCTION pgaudit.follow(table_name name) RETURNS VARCHAR
+LANGUAGE plpgsql AS $follow_table_whithout_schema$
+BEGIN
+    RETURN pgaudit.follow('public', table_name);
+END
+$follow_table_whithout_schema$;
+
+CREATE OR REPLACE FUNCTION pgaudit.unfollow(table_name name) RETURNS VARCHAR
+LANGUAGE plpgsql AS $unfollow_table_whithout_schema$
+BEGIN
+    RETURN pgaudit.unfollow('public', table_name);
+END
+$unfollow_table_whithout_schema$;

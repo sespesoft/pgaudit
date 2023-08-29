@@ -25,7 +25,7 @@ Se debe ejecutar el script **pgaudit.sql** dentro de la base de datos a auditar,
 
 Configuración
 -------------
-Con solo ejecutar el archivo pgaudit.sql se crea toda la estructura que da soporte al sistema de auditoria, pero no funcionara hasta que se configuren las acciones a auditar; para esto se creo el archivo **config.sql** en él se encuentran los inserts necesarios para alimentar la tabla config del esquema pgaudit.
+las configuraciones se manejan desde la tabla **pgaudit.config** la cual tiene la siguiente estructura.
 
 | key | value | state |
 |-----|-------|-------|
@@ -33,7 +33,7 @@ Con solo ejecutar el archivo pgaudit.sql se crea toda la estructura que da sopor
 | U | UPDATE | 1 |
 | D | DELETE | 1 |
 
-Si el sistema es ejecutado sin una configuración establecida no ingresara datos a las tablas auditadas, de igual manera es posible desactivar la auditoria de un comando cambiando el estado a 0 o eliminado el registro.
+Es posible desactivar la auditoria de un comando cambiando el estado a 0 o eliminado el registro.
 
 Uso
 ---
@@ -68,9 +68,15 @@ $db->exec("SELECT pgaudit.trail('{$session}')");
 
 Se debe tener especial cuidado de ejecutar correctamente esta función, en ocaciones se puede perder la referencia al log ya que la conexión se cierra y con ella la tabla temporal que mantiene el dato en sesión para ser consumido por el trigger.
 
-Dividiendo el log
+Histórico
 ----
-`pgaudit.split(format)` **split.sql** se creo para dividir el log de auditoria por fechas, al ejecutar la función se creará una nueva tabla con la forma *pgaudit.log_(format)* y se eliminarán de la tabla principal los registros. Si se ejecuta sin un formato establecido `pgaudit.split()` se creara una nueva tabla con la forma *pgaudit.log_YYYY_MM_DD_HH24MISSMS*.
+**history.sql** se creeo como reemplazo del antiguo **split.sql** la idea ya no es dividir el log en multiples tablas fisicas, si no que haciendo uso de una tabla particionada **pgaudit.history** almacenar toda la información de la tabla principal gracias a la función `pgaudit.vacuum(TIMESTAMP WITH TIME ZONE)` la cual se encarga de crear las particiones dentro de la tabla. Si no se le envía un párametro a la función esta tomara por defecto la fecha actual.
+
+Finalmente se debe configurar la key *H* por defecto con valor *YYYY* lo cual generaria particiones de tipo *log_YYYY*.
+
+| key | value | state |
+|-----|-------|-------|
+| H | YYYY | 1 |
 
 Consultas
 ----
@@ -90,3 +96,7 @@ SELECT new, old
 FROM pgaudit.log
 WHERE table_name = 'public.user' AND new->>'name' = 'admin';
 ```
+TODO
+---
+* Agregar formato YYYY_MM al sistema de histórico
+* Crear un sistema en el cual se pueda agregar el log directamente al histórico

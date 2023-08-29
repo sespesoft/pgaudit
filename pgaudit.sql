@@ -6,6 +6,11 @@ CREATE TABLE IF NOT EXISTS pgaudit.config(
     state bit(1) NOT NULL DEFAULT '1'
 );
 
+INSERT INTO pgaudit.config (key, value) VALUES 
+('I', 'INSERT'),
+('U', 'UPDATE'),
+('D', 'DELETE');
+
 CREATE TABLE IF NOT EXISTS pgaudit.log(
     id            SERIAL NOT NULL PRIMARY KEY,
     table_name    VARCHAR(250),

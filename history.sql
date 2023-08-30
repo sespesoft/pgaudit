@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS pgaudit.history (
     table_name    VARCHAR(250),
     register_date TIMESTAMP WITH TIME ZONE NOT NULL,
     user_db       TEXT NOT NULL,
-    session_id        TEXT,
+    session_id    TEXT,
     command       CHAR(1) NOT NULL,
     old           JSON,
     new           JSON

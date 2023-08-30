@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS pgaudit.log(
     table_name    VARCHAR(250),
     register_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
     user_db       TEXT NOT NULL DEFAULT USER,
-    session_id        TEXT,
+    session_id    TEXT,
     command       CHAR(1) NOT NULL REFERENCES pgaudit.config(key),
     old           JSON,
     new           JSON
@@ -29,7 +29,7 @@ DECLARE
     table_name TEXT;
     config RECORD;
 BEGIN
-table_name := TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME;
+    table_name := TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME;
     PERFORM relname
     FROM pg_class
     WHERE relname = 'tbl_session'
@@ -61,9 +61,8 @@ DECLARE
     table_origin TEXT;
 BEGIN
     table_origin := schema || '.' || table_name;
-    EXECUTE 'DROP TRIGGER IF EXISTS audit ON ' || table_origin';
-    DROP FUNCTION IF EXIST pgaudit.track();';
-    RETURN table_origin || ' table ending auditing...';
+    EXECUTE 'DROP TRIGGER IF EXISTS audit ON ' || table_origin;
+    RETURN table_origin || ' table is no longer audited...';
 END
 $unfollow_table$;
 
@@ -76,7 +75,6 @@ BEGIN
     EXECUTE 'DROP TRIGGER IF EXISTS audit ON ' || table_origin || ';CREATE TRIGGER audit ' ||
         ' AFTER INSERT OR UPDATE OR DELETE ON ' || table_origin ||
         ' FOR EACH ROW EXECUTE PROCEDURE pgaudit.track();';
-
     RETURN table_origin || ' table being audited...';
 END
 $follow_table$;

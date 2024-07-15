@@ -2,21 +2,22 @@
 
 CREATE TABLE IF NOT EXISTS pgaudit.config(
     key char(1) NOT NULL PRIMARY KEY,
-    value varchar(20) NOT NULL,
-    state bit(1) NOT NULL DEFAULT '1'
+    value varchar(20) NOT NULL
 );
 
 INSERT INTO pgaudit.config (key, value) VALUES 
 ('I', 'INSERT'),
+--('Q', 'QUERY'),
 ('U', 'UPDATE'),
-('D', 'DELETE');
+('D', 'DELETE'),
+('H', 'YYYYY');
 
 CREATE TABLE IF NOT EXISTS pgaudit.log(
     id            SERIAL NOT NULL PRIMARY KEY,
-    table_name    VARCHAR(250),
+    audit_object  VARCHAR(4000),
     register_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT current_timestamp,
-    user_db       TEXT NOT NULL DEFAULT USER,
-    session_id    TEXT,
+    user_db       VARCHAR(63) NOT NULL DEFAULT USER,
+    session_id    VARCHAR(40),
     command       CHAR(1) NOT NULL REFERENCES pgaudit.config(key),
     old           JSON,
     new           JSON
@@ -41,14 +42,14 @@ BEGIN
         session_id := (SELECT value FROM tbl_session WHERE name = 'session_id');
     END IF;
 
-    SELECT * INTO config FROM pgaudit.config WHERE value = TG_OP AND state = '1';
+    SELECT * INTO config FROM pgaudit.config WHERE value = TG_OP;
     IF FOUND THEN
         IF TG_OP = 'INSERT' THEN
-            INSERT INTO pgaudit.log(session_id, table_name, command, new) VALUES (session_id,  table_name, config.key, row_to_json(NEW));
+            INSERT INTO pgaudit.log(session_id, audit_object, command, new) VALUES (session_id,  table_name, config.key, row_to_json(NEW));
         ELSIF TG_OP = 'DELETE' THEN
-            INSERT INTO pgaudit.log(session_id, table_name, command, old) VALUES (session_id, table_name, config.key, row_to_json(OLD));
+            INSERT INTO pgaudit.log(session_id, audit_object, command, old) VALUES (session_id, table_name, config.key, row_to_json(OLD));
         ELSIF TG_OP = 'UPDATE' THEN
-            INSERT INTO pgaudit.log(session_id, table_name, command, old, new) VALUES (session_id, table_name, config.key, row_to_json(OLD), row_to_json(NEW));
+            INSERT INTO pgaudit.log(session_id, audit_object, command, old, new) VALUES (session_id, table_name, config.key, row_to_json(OLD), row_to_json(NEW));
         END IF;
     END IF;
     RETURN NULL;
